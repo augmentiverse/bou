@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+  />
+
+  <title>bou1 AR Anchor</title>
+
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/aframe-extras@7.5.1/dist/aframe-extras.min.js"></script>
+
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: transparent;
+      font-family: Arial, sans-serif;
+    }
+
+    canvas {
+      background: transparent !important;
+    }
+
+    #startButton {
+      position: fixed;
+      z-index: 9999;
+      left: 50%;
+      bottom: 30px;
+      transform: translateX(-50%);
+      padding: 14px 24px;
+      border: none;
+      border-radius: 30px;
+      background: white;
+      color: black;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    #status {
+      position: fixed;
+      z-index: 9999;
+      top: 15px;
+      left: 15px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.65);
+      color: white;
+      font-size: 14px;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="status">Tap Start AR</div>
+  <button id="startButton">Start AR</button>
+
+  <a-scene
+    id="scene"
+    mindar-image="
+      imageTargetSrc: targets.mind;
+      autoStart: false;
+      uiScanning: yes;
+    "
+    embedded
+    color-space="sRGB"
+    renderer="
+      alpha: true;
+      antialias: true;
+      colorManagement: true;
+      physicallyCorrectLights: true;
+    "
+    vr-mode-ui="enabled: false"
+    device-orientation-permission-ui="enabled: false">
+
+    <a-assets timeout="30000">
+
+      <a-asset-item id="bouModel" src="bou1.glb"></a-asset-item>
+
+      <!-- IMPORTANT: no muted attribute -->
+      <video
+        id="bouVideo"
+        src="bou1.mp4"
+        preload="auto"
+        loop
+        playsinline
+        webkit-playsinline
+        crossorigin="anonymous">
+      </video>
+
+    </a-assets>
+
+    <a-camera position="0 0 0" look-controls="false"></a-camera>
+
+    <a-light type="ambient" intensity="1.2"></a-light>
+    <a-light type="directional" position="0 1 1" intensity="0.8"></a-light>
+
+    <a-entity id="bouTarget" mindar-image-target="targetIndex: 0">
+
+      <!-- GLB model above the image -->
+      <a-gltf-model
+        id="bouAugmentation"
+        src="#bouModel"
+        position="0 0 0.12"
+        rotation="0 0 0"
+        scale="0.25 0.25 0.25"
+        animation-mixer>
+      </a-gltf-model>
+
+      <!-- Video anchored on the image -->
+      <a-video
+        id="bouVideoPlane"
+        src="#bouVideo"
+        position="0 -0.65 0.04"
+        rotation="0 0 0"
+        width="0.9"
+        height="0.5">
+      </a-video>
+
+    </a-entity>
+
+  </a-scene>
+
+  <script>
+    const sceneEl = document.querySelector("#scene");
+    const startButton = document.querySelector("#startButton");
+    const statusEl = document.querySelector("#status");
+    const targetEl = document.querySelector("#bouTarget");
+    const videoEl = document.querySelector("#bouVideo");
+
+    sceneEl.addEventListener("renderstart", () => {
+      if (sceneEl.renderer) {
+        sceneEl.renderer.setClearColor(0x000000, 0);
+        sceneEl.renderer.domElement.style.background = "transparent";
+      }
+    });
+
+    startButton.addEventListener("click", async () => {
+      try {
+        const mindarSystem = sceneEl.systems["mindar-image-system"];
+
+        // Enable audio after user interaction
+        videoEl.muted = false;
+        videoEl.volume = 1.0;
+
+        // Unlock video playback on mobile browsers
+        await videoEl.play();
+        videoEl.pause();
+        videoEl.currentTime = 0;
+
+        await mindarSystem.start();
+
+        startButton.classList.add("hidden");
+        statusEl.textContent = "Scanning for bou1 image...";
+      } catch (error) {
+        console.error(error);
+        statusEl.textContent = "AR failed to start. Check camera/audio permissions.";
+      }
+    });
+
+    targetEl.addEventListener("targetFound", async () => {
+      statusEl.textContent = "Target found — model and video anchored";
+
+      try {
+        videoEl.muted = false;
+        videoEl.volume = 1.0;
+        await videoEl.play();
+      } catch (error) {
+        console.warn("Video play failed:", error);
+      }
+    });
+
+    targetEl.addEventListener("targetLost", () => {
+      statusEl.textContent = "Target lost — point camera at bou1 image";
+      videoEl.pause();
+    });
+  </script>
+
+</body>
+</html>
